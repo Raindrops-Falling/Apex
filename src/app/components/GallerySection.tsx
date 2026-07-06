@@ -18,21 +18,22 @@ const content: Record<Tab, { title: string; desc: string }> = {
   },
 };
 
-// ── Force graph ───────────────────────────────────────────────────────────
-interface SimNode { id: string; label: string; r: number; color: string; x: number; y: number; vx: number; vy: number; }
+// ── Force graph data ──────────────────────────────────────────────────────
+interface Node { id: string; label: string; r: number; color: string; x: number; y: number; vx: number; vy: number; }
 interface Edge { source: string; target: string; }
 
-const NODES: SimNode[] = [
-  { id: 'bio',   label: 'Biology',    r: 22, color: '#7aaa38', x: 200, y: 120, vx: 0.4,  vy: -0.3 },
-  { id: 'chem',  label: 'Chemistry',  r: 18, color: '#c8906a', x: 420, y: 80,  vx: -0.2, vy: 0.4  },
-  { id: 'math',  label: 'Math',       r: 21, color: '#7aaa38', x: 560, y: 170, vx: 0.3,  vy: 0.2  },
-  { id: 'phys',  label: 'Physics',    r: 16, color: '#d4aa58', x: 330, y: 230, vx: -0.4, vy: -0.1 },
-  { id: 'cs',    label: 'CS',         r: 20, color: '#7aaa38', x: 140, y: 260, vx: 0.2,  vy: 0.3  },
-  { id: 'hist',  label: 'History',    r: 14, color: '#c8906a', x: 480, y: 270, vx: 0.1,  vy: -0.4 },
-  { id: 'stats', label: 'Statistics', r: 17, color: '#7aaa38', x: 620, y: 230, vx: -0.3, vy: 0.2  },
+const initialNodes: Omit<Node, 'vx' | 'vy'>[] = [
+  { id: 'bio',   label: 'Biology 301',    r: 22, color: '#7aaa38', x: 200, y: 120 },
+  { id: 'chem',  label: 'Chemistry',      r: 18, color: '#c8906a', x: 380, y: 80  },
+  { id: 'math',  label: 'Math Analysis',  r: 20, color: '#7aaa38', x: 520, y: 160 },
+  { id: 'phys',  label: 'Physics',        r: 16, color: '#d4aa58', x: 320, y: 220 },
+  { id: 'cs',    label: 'CS Algorithms',  r: 19, color: '#7aaa38', x: 160, y: 260 },
+  { id: 'hist',  label: 'History',        r: 14, color: '#c8906a', x: 460, y: 280 },
+  { id: 'lit',   label: 'Lit Review',     r: 13, color: '#d4aa58', x: 90,  y: 180 },
+  { id: 'stats', label: 'Statistics',     r: 17, color: '#7aaa38', x: 600, y: 230 },
 ];
 
-const EDGES: Edge[] = [
+const edges: Edge[] = [
   { source: 'bio',  target: 'chem'  },
   { source: 'bio',  target: 'phys'  },
   { source: 'chem', target: 'math'  },
@@ -41,115 +42,117 @@ const EDGES: Edge[] = [
   { source: 'cs',   target: 'math'  },
   { source: 'cs',   target: 'stats' },
   { source: 'phys', target: 'hist'  },
+  { source: 'bio',  target: 'lit'   },
+  { source: 'hist', target: 'lit'   },
 ];
 
-const W = 700, H = 300;
-
-function ForceGraph() {
-  const svgRef = useRef<SVGSVGElement>(null);
-  // Physics state lives entirely in a ref — never touches React state
-  const sim = useRef<SimNode[]>(NODES.map(n => ({ ...n })));
+function useForceGraph(W: number, H: number) {
+  const [nodes, setNodes] = useState<Node[]>(() =>
+    initialNodes.map(n => ({ ...n, vx: 0, vy: 0 }))
+  );
+  const frameRef = useRef<number>(0);
 
   useEffect(() => {
-    let raf: number;
+    let ns = nodes.map(n => ({ ...n }));
 
     const tick = () => {
-      const ns = sim.current;
+      const k = 0.006; // spring constant
+      const repulsion = 2800;
+      const damping = 0.82;
+      const centerStrength = 0.012;
 
-      // Repulsion between all pairs
-      for (let i = 0; i < ns.length; i++) {
-        for (let j = i + 1; j < ns.length; j++) {
-          const dx = ns[j].x - ns[i].x;
-          const dy = ns[j].y - ns[i].y;
-          const distSq = Math.max(dx * dx + dy * dy, 1);
-          const dist = Math.sqrt(distSq);
-          const force = 3800 / distSq;
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
-          ns[i].vx -= fx; ns[i].vy -= fy;
-          ns[j].vx += fx; ns[j].vy += fy;
+      // Clone for mutation
+      const next = ns.map(n => ({ ...n }));
+
+      // Repulsion between every pair
+      for (let i = 0; i < next.length; i++) {
+        for (let j = i + 1; j < next.length; j++) {
+          const dx = next[j].x - next[i].x;
+          const dy = next[j].y - next[i].y;
+          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+          const force = repulsion / (dist * dist);
+          next[i].vx -= (dx / dist) * force;
+          next[i].vy -= (dy / dist) * force;
+          next[j].vx += (dx / dist) * force;
+          next[j].vy += (dy / dist) * force;
         }
       }
 
-      // Edge spring attraction
-      EDGES.forEach(e => {
-        const s = ns.find(n => n.id === e.source)!;
-        const t = ns.find(n => n.id === e.target)!;
+      // Spring attraction along edges
+      edges.forEach(e => {
+        const s = next.find(n => n.id === e.source)!;
+        const t = next.find(n => n.id === e.target)!;
         const dx = t.x - s.x, dy = t.y - s.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const restLen = 140;
-        const force = (dist - restLen) * 0.007;
-        const fx = (dx / dist) * force, fy = (dy / dist) * force;
-        s.vx += fx; s.vy += fy;
-        t.vx -= fx; t.vy -= fy;
+        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+        const target = 130;
+        const force = (dist - target) * k;
+        s.vx += (dx / dist) * force;
+        s.vy += (dy / dist) * force;
+        t.vx -= (dx / dist) * force;
+        t.vy -= (dy / dist) * force;
       });
 
-      // Center gravity + thermal noise + damping + boundary
-      ns.forEach(n => {
-        n.vx += (W / 2 - n.x) * 0.008;
-        n.vy += (H / 2 - n.y) * 0.008;
-        // Persistent thermal noise keeps nodes in perpetual gentle motion
-        n.vx += (Math.random() - 0.5) * 0.55;
-        n.vy += (Math.random() - 0.5) * 0.55;
-        n.vx *= 0.88;
-        n.vy *= 0.88;
-        n.x = Math.max(n.r + 6, Math.min(W - n.r - 6, n.x + n.vx));
-        n.y = Math.max(n.r + 6, Math.min(H - n.r - 6, n.y + n.vy));
+      // Gravity toward center
+      next.forEach(n => {
+        n.vx += (W / 2 - n.x) * centerStrength;
+        n.vy += (H / 2 - n.y) * centerStrength;
+        n.vx *= damping;
+        n.vy *= damping;
+        n.x = Math.max(n.r + 4, Math.min(W - n.r - 4, n.x + n.vx));
+        n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y + n.vy));
       });
 
-      // Imperatively update SVG DOM — zero React reconciliation overhead
-      const svg = svgRef.current;
-      if (svg) {
-        ns.forEach(n => {
-          const c = svg.querySelector<SVGCircleElement>(`[data-id="${n.id}"]`);
-          const t = svg.querySelector<SVGTextElement>(`[data-label="${n.id}"]`);
-          if (c) { c.setAttribute('cx', n.x.toFixed(1)); c.setAttribute('cy', n.y.toFixed(1)); }
-          if (t) { t.setAttribute('x', n.x.toFixed(1)); t.setAttribute('y', (n.y + 4).toFixed(1)); }
-        });
-        EDGES.forEach((e, i) => {
-          const line = svg.querySelector<SVGLineElement>(`[data-edge="${i}"]`);
-          const s = ns.find(n => n.id === e.source);
-          const t = ns.find(n => n.id === e.target);
-          if (line && s && t) {
-            line.setAttribute('x1', s.x.toFixed(1)); line.setAttribute('y1', s.y.toFixed(1));
-            line.setAttribute('x2', t.x.toFixed(1)); line.setAttribute('y2', t.y.toFixed(1));
-          }
-        });
-      }
-
-      raf = requestAnimationFrame(tick);
+      ns = next;
+      setNodes(next.map(n => ({ ...n })));
+      frameRef.current = requestAnimationFrame(tick);
     };
 
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+    frameRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [W, H]);
+
+  return nodes;
+}
+
+function ForceGraph() {
+  const W = 700, H = 320;
+  const nodes = useForceGraph(W, H);
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
 
   return (
     <svg
-      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
       style={{ display: 'block', height: H }}
     >
-      {/* Edges — initial positions, updated via DOM ref */}
-      {EDGES.map((e, i) => {
-        const s = NODES.find(n => n.id === e.source)!;
-        const t = NODES.find(n => n.id === e.target)!;
+      {/* Edges */}
+      {edges.map((e, i) => {
+        const s = nodeMap[e.source], t = nodeMap[e.target];
+        if (!s || !t) return null;
         return (
-          <line key={i} data-edge={String(i)}
+          <line
+            key={i}
             x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-            stroke="rgba(28,40,20,0.2)" strokeWidth="1.2" />
+            stroke="rgba(28,40,20,0.18)"
+            strokeWidth="1"
+          />
         );
       })}
 
-      {/* Nodes — initial positions, updated via DOM ref */}
-      {NODES.map(n => (
+      {/* Nodes */}
+      {nodes.map(n => (
         <g key={n.id}>
-          <circle data-id={n.id} cx={n.x} cy={n.y} r={n.r} fill={n.color} opacity="0.88" />
-          <text data-label={n.id} x={n.x} y={n.y + 4}
-            textAnchor="middle" fontSize="8" fontFamily="Inter, sans-serif"
-            fontWeight="700" fill="white" style={{ pointerEvents: 'none', userSelect: 'none' }}>
-            {n.label}
+          <circle cx={n.x} cy={n.y} r={n.r} fill={n.color} opacity="0.85" />
+          <text
+            x={n.x} y={n.y + 4}
+            textAnchor="middle"
+            fontSize="7.5"
+            fontFamily="Inter, sans-serif"
+            fontWeight="600"
+            fill="white"
+          >
+            {n.label.split(' ')[0]}
           </text>
         </g>
       ))}
@@ -165,7 +168,7 @@ export function GallerySection() {
       className="overflow-hidden"
       style={{ backgroundColor: '#ffffff', fontFamily: 'Inter, sans-serif' }}
     >
-      {/* Full-width force graph */}
+      {/* ── Top: force graph (full width) ─────────────────────────── */}
       <div
         className="w-full px-4 md:px-10 pt-10 pb-4"
         style={{ borderTop: '1px solid rgba(28,40,20,0.08)', backgroundColor: '#faf8f4' }}
@@ -173,21 +176,28 @@ export function GallerySection() {
         <ForceGraph />
       </div>
 
-      {/* Tabs + full-width content */}
+      {/* ── Bottom: full-width text + tabs ────────────────────────── */}
       <div className="w-full px-8 md:px-14 py-12 md:py-16">
+        {/* Tabs */}
         <div className="flex items-center gap-6 mb-8">
-          {TABS.map(tab => {
+          {TABS.map((tab) => {
             const isActive = tab === active;
             return (
-              <button key={tab} onClick={() => setActive(tab)}
+              <button
+                key={tab}
+                onClick={() => setActive(tab)}
                 className="flex items-center gap-1.5 text-xs transition-colors"
                 style={{
-                  fontWeight: 600, letterSpacing: '0.1em',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
                   color: isActive ? '#1c2814' : 'rgba(28,40,20,0.35)',
                   paddingBottom: '3px',
                   borderBottom: isActive ? '1.5px solid #1c2814' : '1.5px solid transparent',
-                }}>
-                {isActive && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: '#7aaa38' }} />}
+                }}
+              >
+                {isActive && (
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: '#7aaa38' }} />
+                )}
                 {tab}
               </button>
             );
@@ -199,7 +209,9 @@ export function GallerySection() {
             style={{
               fontFamily: '"Playfair Display", Georgia, serif',
               fontSize: 'clamp(24px, 3.5vw, 40px)',
-              fontWeight: 400, color: '#1c2814', lineHeight: 1.2,
+              fontWeight: 400,
+              color: '#1c2814',
+              lineHeight: 1.2,
             }}
           >
             {content[active].title}

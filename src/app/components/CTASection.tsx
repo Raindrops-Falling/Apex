@@ -1,4 +1,3 @@
-import { Link } from 'react-router';
 import { ArrowRight } from 'lucide-react';
 import { CurvedLines } from './CurvedLines';
 
@@ -8,6 +7,7 @@ export function CTASection() {
       className="relative flex flex-col items-center justify-center overflow-hidden"
       style={{ backgroundColor: '#f5f0e8', minHeight: '100vh' }}
     >
+      {/* bottom-right to top-left — opposite of hero */}
       <CurvedLines direction="br-tl" opacity={0.12} count={15} spacing={108} />
 
       <div className="relative z-10 flex flex-col items-center text-center px-6 py-24 w-full max-w-4xl mx-auto">
@@ -16,13 +16,12 @@ export function CTASection() {
           Get started today
         </p>
 
-        <h1
-          style={{
-            fontFamily: '"Playfair Display", Georgia, serif',
-            fontSize: 'clamp(40px, 7vw, 84px)',
-            lineHeight: 1.08, letterSpacing: '-0.02em', color: '#1c2814', width: '100%',
-          }}
-        >
+        <h1 style={{
+          fontFamily: '"Playfair Display", Georgia, serif',
+          fontSize: 'clamp(40px, 7vw, 84px)',
+          lineHeight: 1.08, letterSpacing: '-0.02em', color: '#1c2814',
+          width: '100%',
+        }}>
           <span style={{ fontWeight: 300 }}>Make every </span>
           <span style={{ fontWeight: 700 }}>study</span>
           <br />
@@ -34,13 +33,12 @@ export function CTASection() {
           Automate scheduling and reduce the cognitive load that derails deep learning
         </p>
 
-        <Link
-          to="/upload"
-          className="mt-9 flex items-center gap-2 px-7 py-3 rounded-full text-sm no-underline transition-all hover:opacity-80"
+        <button
+          className="mt-9 flex items-center gap-2 px-7 py-3 rounded-full text-sm transition-all"
           style={{ fontFamily: 'Inter, sans-serif', border: '1px solid rgba(28,40,20,0.3)', fontWeight: 500, color: '#1c2814' }}
         >
           Get started <ArrowRight size={14} />
-        </Link>
+        </button>
       </div>
     </section>
   );

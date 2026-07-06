@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router';
-import { supabase } from '../context/AuthContext';
-import { CurvedLines } from '../components/CurvedLines';
-import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { CurvedLines } from './CurvedLines';
+
+const supabase = createClient(
+  `https://${projectId}.supabase.co`,
+  publicAnonKey,
+);
 
 const ApexIcon = () => (
   <svg width="32" height="26" viewBox="0 0 28 22" fill="none">
@@ -21,26 +25,28 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export function LoginPage() {
-  const navigate = useNavigate();
+interface LoginPageProps {
+  onLogin: () => void;
+}
+
+export function LoginPage({ onLogin }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // If already authed after OAuth redirect, bounce to upload
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/upload', { replace: true });
-    });
-  }, [navigate]);
-
-  const handleGoogle = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/upload` },
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
-    if (error) { setError(error.message); setLoading(false); }
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    }
+    // On success the page redirects — no need to call onLogin() here.
   };
 
   return (
@@ -50,22 +56,20 @@ export function LoginPage() {
     >
       <CurvedLines direction="tl-br" opacity={0.09} count={14} spacing={108} />
 
-      {/* Back link */}
-      <Link
-        to="/"
-        className="absolute top-6 left-6 z-20 flex items-center gap-1.5 text-sm transition-opacity hover:opacity-60"
-        style={{ color: 'rgba(28,40,20,0.6)', fontWeight: 500 }}
+      {/* Card */}
+      <div
+        className="relative z-10 w-full mx-4"
+        style={{ maxWidth: 400 }}
       >
-        <ArrowLeft size={14} /> Home
-      </Link>
-
-      <div className="relative z-10 w-full mx-4" style={{ maxWidth: 400 }}>
         {/* Logo */}
-        <Link to="/" className="flex flex-col items-center mb-10 gap-3 no-underline">
+        <div className="flex flex-col items-center mb-10 gap-3">
           <ApexIcon />
-          <span style={{ fontSize: 22, fontWeight: 700, color: '#1c2814', letterSpacing: '-0.02em' }}>apex</span>
-        </Link>
+          <span style={{ fontSize: 22, fontWeight: 700, color: '#1c2814', letterSpacing: '-0.02em' }}>
+            apex
+          </span>
+        </div>
 
+        {/* Card body */}
         <div
           className="rounded-2xl p-8 flex flex-col gap-6"
           style={{
@@ -78,8 +82,11 @@ export function LoginPage() {
             <h1
               style={{
                 fontFamily: '"Playfair Display", Georgia, serif',
-                fontSize: 26, fontWeight: 400, color: '#1c2814',
-                lineHeight: 1.2, marginBottom: 8,
+                fontSize: 26,
+                fontWeight: 400,
+                color: '#1c2814',
+                lineHeight: 1.2,
+                marginBottom: 8,
               }}
             >
               Welcome back
@@ -89,24 +96,38 @@ export function LoginPage() {
             </p>
           </div>
 
+          {/* Google OAuth button */}
           <button
-            onClick={handleGoogle}
+            onClick={handleGoogleLogin}
             disabled={loading}
             className="flex items-center justify-center gap-3 w-full py-3 rounded-xl transition-all"
             style={{
               border: '1px solid rgba(28,40,20,0.18)',
               backgroundColor: loading ? 'rgba(28,40,20,0.04)' : '#ffffff',
-              color: '#1c2814', fontSize: 14, fontWeight: 500,
+              color: '#1c2814',
+              fontSize: 14,
+              fontWeight: 500,
               cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? <span style={{ opacity: 0.6 }}>Redirecting…</span> : <><GoogleIcon /> Continue with Google</>}
+            {loading ? (
+              <span style={{ opacity: 0.6 }}>Redirecting…</span>
+            ) : (
+              <>
+                <GoogleIcon />
+                Continue with Google
+              </>
+            )}
           </button>
 
-          {error && <p style={{ fontSize: 13, color: '#c0392b', textAlign: 'center' }}>{error}</p>}
+          {error && (
+            <p style={{ fontSize: 13, color: '#c0392b', textAlign: 'center' }}>
+              {error}
+            </p>
+          )}
 
           <p style={{ fontSize: 12, color: 'rgba(28,40,20,0.38)', textAlign: 'center', lineHeight: 1.6 }}>
-            By continuing you agree to Apex's{' '}
+            By continuing, you agree to Apex's{' '}
             <a href="#" style={{ color: '#1c2814', textDecoration: 'underline' }}>Terms</a>
             {' '}and{' '}
             <a href="#" style={{ color: '#1c2814', textDecoration: 'underline' }}>Privacy Policy</a>.
