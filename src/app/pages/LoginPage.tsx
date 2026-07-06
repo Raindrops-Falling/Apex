@@ -26,24 +26,19 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect to /upload if session already exists (covers OAuth code exchange on page load)
+  // If already authed after OAuth redirect, bounce to upload
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate('/upload', { replace: true });
     });
-    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleGoogle = async () => {
     setLoading(true);
     setError('');
-    // redirectTo must exactly match a URL in your Supabase → Authentication →
-    // URL Configuration → Redirect URLs allowlist.
-    // Add   https://apex-one-topaz.vercel.app/**   there to cover all paths.
-    const redirectTo = `${window.location.origin}/upload`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo },
+      options: { redirectTo: `${window.location.origin}/upload` },
     });
     if (error) { setError(error.message); setLoading(false); }
   };

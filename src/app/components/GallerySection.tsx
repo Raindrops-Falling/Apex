@@ -91,8 +91,8 @@ function ForceGraph() {
         // Persistent thermal noise keeps nodes in perpetual gentle motion
         n.vx += (Math.random() - 0.5) * 0.55;
         n.vy += (Math.random() - 0.5) * 0.55;
-        n.vx *= 0.70;
-        n.vy *= 0.60;
+        n.vx *= 0.88;
+        n.vy *= 0.88;
         n.x = Math.max(n.r + 6, Math.min(W - n.r - 6, n.x + n.vx));
         n.y = Math.max(n.r + 6, Math.min(H - n.r - 6, n.y + n.vy));
       });
