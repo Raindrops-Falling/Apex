@@ -6,6 +6,12 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 export const supabase = createClient(
   `https://${projectId}.supabase.co`,
   publicAnonKey,
+  {
+    auth: {
+      flowType: 'pkce',          // exchanges a short ?code= instead of exposing tokens in the hash
+      detectSessionInUrl: true,  // automatically picks up the ?code= on redirect
+    },
+  },
 );
 
 const API = `https://${projectId}.supabase.co/functions/v1/make-server-0158a663`;
